@@ -1,16 +1,18 @@
 package com.sato_lab.game.unlock;
 
-import android.content.res.Resources;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.SystemClock;
 import android.support.v7.app.ActionBarActivity;
+import android.text.Html;
 import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Chronometer;
+import android.widget.GridLayout;
 import android.widget.Toast;
 
 import java.util.ArrayList;
@@ -26,6 +28,9 @@ public class GameActivity extends ActionBarActivity {
     Boolean isFinished = false;
     Chronometer mChronometer = null;
     long mLastStopTime = 0;
+    List<String> fontNameList = null;
+    List<Integer> shuffleList = null;
+    Handler booHandler = null;
 
     public void showToast(CharSequence text) {
         Toast ts = Toast.makeText(this, text, Toast.LENGTH_SHORT);
@@ -42,16 +47,18 @@ public class GameActivity extends ActionBarActivity {
                 return;
             }
 
-            Button btn = (Button) findViewById(v.getId());
+            Button btn = (Button) v;
 
             Integer faceNum = btnIdFaceNumMap.get(btn.getId());
 
-            if (faceNum == 0) {
+            System.out.println("click btn face num = " + faceNum);
+
+            if (faceNum < 0) {
                 //already open
                 return;
             }
 
-            btn.setText(String.valueOf(faceNum));
+            btn.setText(Html.fromHtml(fontNameList.get(faceNum)));
 
             if (pairList.isEmpty()) {
 
@@ -72,16 +79,19 @@ public class GameActivity extends ActionBarActivity {
                 if (firstBtn.getText().equals(secondBtn.getText())) {
 
                     //bingo!
-                    btnIdFaceNumMap.put(firstBtn.getId(), 0);
-                    btnIdFaceNumMap.put(secondBtn.getId(), 0);
+                    btnIdFaceNumMap.put(firstBtn.getId(), -1);
+                    btnIdFaceNumMap.put(secondBtn.getId(), -1);
 
-                    Integer total = 0;
+                    Boolean isCompleted = true;
                     for (Integer statNum : btnIdFaceNumMap.values()) {
-                        total += statNum;
+                        if (statNum >= 0) {
+                            isCompleted = false;
+                        }
                     }
-                    if (total == 0) {
+                    if (isCompleted) {
                         mChronometer.stop();
                         showToast("Complete!!");
+                        return;
                     }
 
                     System.out.println("match!");
@@ -100,7 +110,7 @@ public class GameActivity extends ActionBarActivity {
                             secondBtn.setText(" ");
                             secondBtn.setOnClickListener(clicked);
                         }
-                    }, 1000);
+                    }, 500);
                 }
 
                 pairList.clear();
@@ -110,47 +120,55 @@ public class GameActivity extends ActionBarActivity {
 
     private void initGame() {
 
-        int MAX_ROW = 6;
-        int MAX_COL = 4;
+        int MAX_ROW = 4;
+        int MAX_COL = 3;
         int MAX_SEQ = (MAX_ROW * MAX_COL) / 2;
 
-/*
-        TableLayout tableLayout = (TableLayout) findViewById(R.id.dynamicTableLayout);
-        TableRow tableRow1 = new TableRow(this);
-
-        Button btn1 = new Button(this);
-        Typeface font = Typeface.createFromAsset(getAssets(), "fontawesome-webfont.ttf");
-        btn1.setTypeface(font);
-        btn1.setText(Html.fromHtml("&#xf082;"));
-
-        tableRow1.addView(btn1);
-        tableLayout.addView(tableRow1);
-*/
-
-        List<Integer> list = new ArrayList();
+        shuffleList = new ArrayList();
 
         for (int i = 0; i < MAX_ROW; i++) {
             for (int j = 0; j < MAX_COL; j++) {
                 Integer faceNum = (i * MAX_COL + j) % MAX_SEQ + 1;
-                list.add(faceNum);
+                shuffleList.add(faceNum);
             }
         }
-        Collections.shuffle(list);
+        Collections.shuffle(shuffleList);
+
+        fontNameList = CsvUtil.loadFile(this, "cheatsheet.csv");
+        System.out.println("fontNameList size = " + fontNameList.size());
+        Collections.shuffle(fontNameList);
+
+        GridLayout gridLayout = (GridLayout) findViewById(R.id.dynamicGridLayout);
+        gridLayout.setColumnCount(MAX_COL);
+        gridLayout.setRowCount(MAX_ROW);
+
+        Typeface font = Typeface.createFromAsset(getAssets(), "fontawesome-webfont.ttf");
 
 
-        Resources res = getResources();
         btnIdFaceNumMap.clear();
 
         for (int i = 0; i < MAX_ROW; i++) {
+
             for (int j = 0; j < MAX_COL; j++) {
 
-                int strId = res.getIdentifier(String.format("ic_custom%d%d", i + 1, j + 1), "id", getPackageName());
-                CustomFontButton btn = (CustomFontButton) findViewById(strId);
+                Button btn = new Button(this);
+                btn.setTypeface(font);
                 btn.setOnClickListener(clicked);
+                btn.setId(i * MAX_COL + j);
                 btn.setText(" ");
-                btnIdFaceNumMap.put(btn.getId(), list.get(i * MAX_COL + j));
+
+                btnIdFaceNumMap.put(btn.getId(), shuffleList.get(i * MAX_COL + j));
+
+                GridLayout.LayoutParams params = new GridLayout.LayoutParams(
+                        GridLayout.spec(i), GridLayout.spec(j));
+
+                btn.setLayoutParams(params);
+
+                gridLayout.addView(btn);
             }
         }
+
+        System.out.println("btnIdFaceNumMap = " + btnIdFaceNumMap);
 
         isFinished = false;
         pairList.clear();
